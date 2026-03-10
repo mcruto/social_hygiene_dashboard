@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Hygiene Clinic Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+
+    <div class="container w-full mx-auto pt-8 px-4 mb-10">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Social Hygiene Dashboard</h1>
+            <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow transition duration-200">
+                Download Excel Report
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-blue-500">
+                <h2 class="text-gray-500 uppercase text-sm font-bold">Total Patients</h2>
+                <p id="totalPatients" class="text-3xl font-bold text-gray-800">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-green-500">
+                <h2 class="text-gray-500 uppercase text-sm font-bold">Total Male</h2>
+                <p id="totalMale" class="text-3xl font-bold text-gray-800">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-purple-500">
+                <h2 class="text-gray-500 uppercase text-sm font-bold">Total Female</h2>
+                <p id="totalFemale" class="text-3xl font-bold text-gray-800">0</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow p-5">
+                <h3 class="font-bold text-gray-700 mb-4">Men vs Women</h3>
+                <canvas id="genderChart"></canvas>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5">
+                <h3 class="font-bold text-gray-700 mb-4">Percentage by Age Group</h3>
+                <canvas id="ageChart"></canvas>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5">
+                <h3 class="font-bold text-gray-700 mb-4">Services Rendered</h3>
+                <canvas id="servicesChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. MOCK DATA 
+        const clinicData = [
+            { PatientID: "SH-001", Date: "2026-03-01", Gender: "Male", Age: 22, AgeGroup: "18-25", Service: "HIV Test" },
+            { PatientID: "SH-002", Date: "2026-03-01", Gender: "Female", Age: 28, AgeGroup: "26-35", Service: "Syphilis Screening" },
+            { PatientID: "SH-003", Date: "2026-03-02", Gender: "Male", Age: 34, AgeGroup: "26-35", Service: "Counseling" },
+            { PatientID: "SH-004", Date: "2026-03-03", Gender: "Male", Age: 45, AgeGroup: "36-50", Service: "HIV Test" },
+            { PatientID: "SH-005", Date: "2026-03-04", Gender: "Female", Age: 19, AgeGroup: "18-25", Service: "Gonorrhea Screening" },
+            { PatientID: "SH-006", Date: "2026-03-05", Gender: "Female", Age: 52, AgeGroup: "51+", Service: "Counseling" },
+            { PatientID: "SH-007", Date: "2026-03-06", Gender: "Male", Age: 25, AgeGroup: "18-25", Service: "HIV Test" },
+            { PatientID: "SH-008", Date: "2026-03-07", Gender: "Female", Age: 31, AgeGroup: "26-35", Service: "Counseling" },
+            { PatientID: "SH-009", Date: "2026-03-08", Gender: "Male", Age: 29, AgeGroup: "26-35", Service: "Syphilis Screening" },
+            { PatientID: "SH-010", Date: "2026-03-09", Gender: "Male", Age: 38, AgeGroup: "36-50", Service: "HIV Test" },
+            { PatientID: "SH-011", Date: "2026-03-10", Gender: "Male", Age: 21, AgeGroup: "18-25", Service: "Gonorrhea Screening" },
+            { PatientID: "SH-012", Date: "2026-03-10", Gender: "Female", Age: 27, AgeGroup: "26-35", Service: "HIV Test" }
+        ];
+
+        // 2. PROCESS DATA FOR DASHBOARD
+        const total = clinicData.length;
+        const maleCount = clinicData.filter(d => d.Gender === 'Male').length;
+        const femaleCount = clinicData.filter(d => d.Gender === 'Female').length;
+
+        // Update Summary Cards
+        document.getElementById('totalPatients').innerText = total;
+        document.getElementById('totalMale').innerText = maleCount;
+        document.getElementById('totalFemale').innerText = femaleCount;
+
+        // Process Age Groups
+        const ageGroups = {"18-25": 0, "26-35": 0, "36-50": 0, "51+": 0};
+        clinicData.forEach(d => {
+            if(ageGroups[d.AgeGroup] !== undefined) {
+                ageGroups[d.AgeGroup]++;
+            }
+        });
+
+        const ageGroupLabels = Object.keys(ageGroups);
+        const ageGroupPercentages = Object.values(ageGroups).map(count => ((count / total) * 100).toFixed(1));
+
+        // Process Services (NEW)
+        const serviceCounts = {};
+        clinicData.forEach(d => {
+            if (serviceCounts[d.Service]) {
+                serviceCounts[d.Service]++;
+            } else {
+                serviceCounts[d.Service] = 1;
+            }
+        });
+        
+        const serviceLabels = Object.keys(serviceCounts);
+        const serviceData = Object.values(serviceCounts);
+
+        // 3. RENDER CHARTS
+        
+        // Gender Pie Chart
+        const ctxGender = document.getElementById('genderChart').getContext('2d');
+        new Chart(ctxGender, {
+            type: 'pie',
+            data: {
+                labels: ['Male', 'Female'],
+                datasets: [{
+                    data: [maleCount, femaleCount],
+                    backgroundColor: ['#3B82F6', '#A855F7'] // Blue and Purple
+                }]
+            }
+        });
+
+        // Age Group Bar Chart
+        const ctxAge = document.getElementById('ageChart').getContext('2d');
+        new Chart(ctxAge, {
+            type: 'bar',
+            data: {
+                labels: ageGroupLabels,
+                datasets: [{
+                    label: 'Percentage (%)',
+                    data: ageGroupPercentages,
+                    backgroundColor: '#10B981' // Green
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+
+        // Services Doughnut Chart (NEW)
+        const ctxServices = document.getElementById('servicesChart').getContext('2d');
+        new Chart(ctxServices, {
+            type: 'doughnut',
+            data: {
+                labels: serviceLabels,
+                datasets: [{
+                    data: serviceData,
+                    // Bright, distinct colors for different services
+                    backgroundColor: ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6'] 
+                }]
+            }
+        });
+
+        // 4. EXPORT TO EXCEL FUNCTION
+        function exportToExcel() {
+            // Create a new workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Convert our JSON mock data to a worksheet
+            // Because 'Service' is already in our clinicData, it automatically gets included in the Excel!
+            const ws = XLSX.utils.json_to_sheet(clinicData);
+            
+            // Append worksheet to workbook
+            XLSX.utils.book_append_sheet(wb, ws, "Patient Report");
+            
+            // Trigger download
+            XLSX.writeFile(wb, "Social_Hygiene_Report.xlsx");
+        }
+    </script>
+</body>
+</html>
