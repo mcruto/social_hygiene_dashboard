@@ -3,110 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clinic Dashboard (Excel Sync)</title>
+    <title>Social Hygiene Clinic Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
-<body class="bg-slate-50 p-8">
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
 
-    <div class="max-w-6xl mx-auto">
-        <div class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-extrabold text-slate-800">Social Hygiene Dashboard</h1>
-            <div class="text-sm text-slate-500">Source: <span class="font-mono">data.xlsx</span></div>
+    <div class="container w-full mx-auto pt-8 px-4">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Social Hygiene Dashboard</h1>
+            <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow">
+                Download Excel Report
+            </button>
         </div>
 
-        <div id="stats" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-blue-500">
+                <h2 class="text-gray-500 uppercase text-sm font-bold">Total Patients</h2>
+                <p id="totalPatients" class="text-3xl font-bold text-gray-800">0</p>
             </div>
+            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-green-500">
+                <h2 class="text-gray-500 uppercase text-sm font-bold">Total Male</h2>
+                <p id="totalMale" class="text-3xl font-bold text-gray-800">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-purple-500">
+                <h2 class="text-gray-500 uppercase text-sm font-bold">Total Female</h2>
+                <p id="totalFemale" class="text-3xl font-bold text-gray-800">0</p>
+            </div>
+        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h3 class="text-lg font-semibold mb-4">Gender Distribution</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow p-5">
+                <h3 class="font-bold text-gray-700 mb-4">Men vs Women</h3>
                 <canvas id="genderChart"></canvas>
             </div>
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h3 class="text-lg font-semibold mb-4">Age Groups (%)</h3>
+            <div class="bg-white rounded-lg shadow p-5">
+                <h3 class="font-bold text-gray-700 mb-4">Percentage of Age Group</h3>
                 <canvas id="ageChart"></canvas>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h3 class="text-lg font-semibold mb-4">Services Provided</h3>
-                <canvas id="serviceChart"></canvas>
             </div>
         </div>
     </div>
 
     <script>
-        // 1. CONFIGURATION: The name of your excel file in GitHub
-        const EXCEL_FILE_PATH = 'data.xlsx';
+        // 1. MOCK DATA (In a real app, this would come from a database)
+        const clinicData = [
+            { PatientID: "SH-001", Date: "2026-03-01", Gender: "Male", Age: 22, AgeGroup: "18-25", Service: "HIV Test" },
+            { PatientID: "SH-002", Date: "2026-03-01", Gender: "Female", Age: 28, AgeGroup: "26-35", Service: "Syphilis Test" },
+            { PatientID: "SH-003", Date: "2026-03-02", Gender: "Male", Age: 34, AgeGroup: "26-35", Service: "Counseling" },
+            { PatientID: "SH-004", Date: "2026-03-03", Gender: "Male", Age: 45, AgeGroup: "36-50", Service: "HIV Test" },
+            { PatientID: "SH-005", Date: "2026-03-04", Gender: "Female", Age: 19, AgeGroup: "18-25", Service: "Gonorrhea Test" },
+            { PatientID: "SH-006", Date: "2026-03-05", Gender: "Female", Age: 52, AgeGroup: "51+", Service: "Routine Checkup" },
+            { PatientID: "SH-007", Date: "2026-03-06", Gender: "Male", Age: 25, AgeGroup: "18-25", Service: "HIV Test" },
+            { PatientID: "SH-008", Date: "2026-03-07", Gender: "Female", Age: 31, AgeGroup: "26-35", Service: "Counseling" },
+            { PatientID: "SH-009", Date: "2026-03-08", Gender: "Male", Age: 29, AgeGroup: "26-35", Service: "Syphilis Test" },
+            { PatientID: "SH-010", Date: "2026-03-09", Gender: "Male", Age: 38, AgeGroup: "36-50", Service: "HIV Test" }
+        ];
 
-        async function initDashboard() {
-            try {
-                // Fetch the Excel file from your GitHub repo
-                const response = await fetch(EXCEL_FILE_PATH);
-                const arrayBuffer = await response.arrayBuffer();
-                
-                // Parse the Excel Data
-                const workbook = XLSX.read(arrayBuffer);
-                const firstSheetName = workbook.SheetNames[0];
-                const rawData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName]);
+        // 2. PROCESS DATA FOR DASHBOARD
+        const total = clinicData.length;
+        const maleCount = clinicData.filter(d => d.Gender === 'Male').length;
+        const femaleCount = clinicData.filter(d => d.Gender === 'Female').length;
 
-                processAndRender(rawData);
-            } catch (error) {
-                console.error("Error loading Excel:", error);
-                document.body.innerHTML = `<div class="p-20 text-center">
-                    <h1 class="text-2xl font-bold text-red-600">Excel File Not Found</h1>
-                    <p>Make sure "data.xlsx" is uploaded to your GitHub repository.</p>
-                </div>`;
+        // Update Summary Cards
+        document.getElementById('totalPatients').innerText = total;
+        document.getElementById('totalMale').innerText = maleCount;
+        document.getElementById('totalFemale').innerText = femaleCount;
+
+        // Process Age Groups
+        const ageGroups = {"18-25": 0, "26-35": 0, "36-50": 0, "51+": 0};
+        clinicData.forEach(d => {
+            if(ageGroups[d.AgeGroup] !== undefined) {
+                ageGroups[d.AgeGroup]++;
             }
+        });
+
+        // Convert Age Group counts to percentages
+        const ageGroupLabels = Object.keys(ageGroups);
+        const ageGroupPercentages = Object.values(ageGroups).map(count => ((count / total) * 100).toFixed(1));
+
+        // 3. RENDER CHARTS
+        // Gender Pie Chart
+        const ctxGender = document.getElementById('genderChart').getContext('2d');
+        new Chart(ctxGender, {
+            type: 'pie',
+            data: {
+                labels: ['Male', 'Female'],
+                datasets: [{
+                    data: [maleCount, femaleCount],
+                    backgroundColor: ['#3B82F6', '#A855F7'] // Blue and Purple
+                }]
+            }
+        });
+
+        // Age Group Bar Chart
+        const ctxAge = document.getElementById('ageChart').getContext('2d');
+        new Chart(ctxAge, {
+            type: 'bar',
+            data: {
+                labels: ageGroupLabels,
+                datasets: [{
+                    label: 'Percentage (%)',
+                    data: ageGroupPercentages,
+                    backgroundColor: '#10B981' // Green
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+
+        // 4. EXPORT TO EXCEL FUNCTION
+        function exportToExcel() {
+            // Create a new workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Convert our JSON mock data to a worksheet
+            const ws = XLSX.utils.json_to_sheet(clinicData);
+            
+            // Append worksheet to workbook
+            XLSX.utils.book_append_sheet(wb, ws, "Patient Report");
+            
+            // Trigger download
+            XLSX.writeFile(wb, "Social_Hygiene_Report.xlsx");
         }
-
-        function processAndRender(data) {
-            // Count Gender
-            const male = data.filter(d => d.Gender === 'Male').length;
-            const female = data.filter(d => d.Gender === 'Female').length;
-
-            // Count Age Groups
-            const ages = {"18-25": 0, "26-35": 0, "36-50": 0, "51+": 0};
-            data.forEach(d => { if(ages[d.AgeGroup] !== undefined) ages[d.AgeGroup]++ });
-
-            // Count Services
-            const services = {};
-            data.forEach(d => { services[d.Service] = (services[d.Service] || 0) + 1 });
-
-            // Update Summary Cards
-            document.getElementById('stats').innerHTML = `
-                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500">
-                    <p class="text-slate-500 text-sm font-bold uppercase">Total Patients</p>
-                    <p class="text-3xl font-bold">${data.length}</p>
-                </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-indigo-500">
-                    <p class="text-slate-500 text-sm font-bold uppercase">Males</p>
-                    <p class="text-3xl font-bold">${male}</p>
-                </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-purple-500">
-                    <p class="text-slate-500 text-sm font-bold uppercase">Females</p>
-                    <p class="text-3xl font-bold">${female}</p>
-                </div>
-            `;
-
-            // Render Charts
-            createChart('genderChart', 'pie', ['Male', 'Female'], [male, female], ['#3b82f6', '#a855f7']);
-            createChart('ageChart', 'bar', Object.keys(ages), Object.values(ages), '#10b981');
-            createChart('serviceChart', 'doughnut', Object.keys(services), Object.values(services), ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6']);
-        }
-
-        function createChart(id, type, labels, data, colors) {
-            new Chart(document.getElementById(id), {
-                type: type,
-                data: {
-                    labels: labels,
-                    datasets: [{ data: data, backgroundColor: colors }]
-                },
-                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-            });
-        }
-
-        initDashboard();
     </script>
 </body>
 </html>
